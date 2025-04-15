@@ -1,15 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  View, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
-  ScrollView, 
-  KeyboardAvoidingView, 
-  Platform, 
-  Alert, 
+import {
+  View,
+  TextInput,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
   Image,
-  Linking 
+  Linking,
+  Keyboard,
+  SafeAreaView,
+  Button
 } from 'react-native';
 import { ThemedText } from '../ThemedText';
 import { ThemedView } from '../ThemedView';
@@ -25,15 +29,18 @@ interface Message {
 }
 
 // TODO: 替换为您的 API token
-const API_TOKEN = 'e55cea29-098f-4383-81b4-cb38dd527e19';
+const API_TOKEN = 'sk-8Jm36nvRw6Ns3MeCsb5km0bliO3qW9XGUhHbCVukvtXJTnAc';
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
+
+
 
   const handleImagePick = async () => {
     try {
@@ -85,19 +92,21 @@ export function ChatInterface() {
     try {
       // 调用 API 获取回答
       const response = await getChatCompletion(
-        selectedImage 
+        selectedImage
           ? `[图片分析请求] ${inputText.trim() || '请分析这张图片'}`
           : inputText.trim(),
         API_TOKEN
       );
-      
-      // 使用打字机效果显示回答
+
+      // 添加 AI 消息，但不立即显示内容
       const assistantMessage: Message = {
         type: 'assistant',
         content: '',
       };
       setMessages(prev => [...prev, assistantMessage]);
+      setIsTyping(false);
 
+      // 使用打字机效果显示回答
       for (let i = 0; i < response.length; i++) {
         await new Promise(resolve => setTimeout(resolve, 50));
         setMessages(prev => {
@@ -117,73 +126,81 @@ export function ChatInterface() {
     }
   };
 
-  useEffect(() => {
-    if (scrollViewRef.current) {
-      scrollViewRef.current.scrollToEnd({ animated: true });
-    }
-  }, [messages]);
+  const renderMessage = (message: Message) => {
+    const isUser = message.type === 'user';
+    return (
+      <View style={[styles.messageContainer, isUser ? styles.userMessage : styles.aiMessage]}>
+        {!isUser && (
+          <Image
+            source={require('../../assets/images/doctor.jpeg')}
+            style={styles.avatar}
+          />
+        )}
+        <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.aiBubble]}>
+          {message.image && (
+            <Image
+              source={{ uri: message.image }}
+              style={styles.messageImage}
+              resizeMode="cover"
+            />
+          )}
+          <ThemedText style={[styles.messageText, isUser && styles.userMessageText]}>
+            {message.content}
+          </ThemedText>
+        </View>
+      </View>
+    );
+  };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardAvoidingView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+
+
+    <SafeAreaView style={styles.scrollContainer}>
+
+      <View style={styles.header}>
+        <Image source={require('../../assets/images/doctor.jpeg')}
+          style={styles.avatar}></Image>
+        <Text style={styles.headerTitle}>SmartHealth</Text>
+
+      </View>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.messagesContainer}
+        contentContainerStyle={[
+          styles.messagesContent,
+          {
+            paddingTop: insets.top,
+            paddingBottom: Math.max(keyboardHeight, insets.bottom)
+          }
+        ]}
+        automaticallyAdjustKeyboardInsets={true}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.scrollContainer}>
-          <ScrollView
-            ref={scrollViewRef}
-            style={styles.messagesContainer}
-            contentContainerStyle={[
-              styles.messagesContent,
-              { paddingBottom: 100 }
-            ]}
-            automaticallyAdjustKeyboardInsets={true}
-          >
-            {messages.length === 0 && (
-              <ThemedView style={styles.welcomeContainer}>
-                <ThemedText style={styles.welcomeText}>
-                  您好！我是您的健康助手，请问有什么可以帮您的吗？
-                </ThemedText>
-              </ThemedView>
-            )}
-            {messages.map((message, index) => (
-              <ThemedView
-                key={index}
-                style={[
-                  styles.messageBubble,
-                  message.type === 'user' ? styles.userMessage : styles.assistantMessage,
-                ]}
-              >
-                {message.image && (
-                  <Image 
-                    source={{ uri: message.image }} 
-                    style={styles.messageImage}
-                    resizeMode="cover"
-                  />
-                )}
-                <ThemedText style={[
-                  styles.messageText,
-                  message.type === 'user' ? styles.userMessageText : styles.assistantMessageText
-                ]}>
-                  {message.content}
-                </ThemedText>
-              </ThemedView>
-            ))}
-            {isTyping && (
-              <ThemedView style={[styles.messageBubble, styles.assistantMessage]}>
-                <ThemedText style={styles.messageText}>正在输入...</ThemedText>
-              </ThemedView>
-            )}
-          </ScrollView>
-        </View>
-        
-        <ThemedView style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+
+        <Text style={styles.headerTime}>Apr 6, 2025, 9:41 AM</Text>
+
+
+        {messages.map(renderMessage)}
+        {isTyping && (
+          <ThemedView style={[styles.messageBubble, styles.assistantMessage]}>
+            <ThemedText style={styles.messageText}>正在输入...</ThemedText>
+          </ThemedView>
+        )}
+      </ScrollView>
+
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} // iOS 用 padding，Android 用 height
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20} // 根据需要调整偏移量
+      >
+
+        <ThemedView style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 4) }]}>
           {selectedImage && (
             <View style={styles.selectedImageContainer}>
-              <Image 
-                source={{ uri: selectedImage }} 
-                style={styles.selectedImagePreview} 
+              <Image
+                source={{ uri: selectedImage }}
+                style={styles.selectedImagePreview}
               />
               <TouchableOpacity
                 style={styles.removeImageButton}
@@ -193,6 +210,7 @@ export function ChatInterface() {
               </TouchableOpacity>
             </View>
           )}
+
           <TouchableOpacity
             style={styles.addButton}
             onPress={handleImagePick}
@@ -219,7 +237,9 @@ export function ChatInterface() {
           </TouchableOpacity>
         </ThemedView>
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
+
+
   );
 }
 
@@ -227,9 +247,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-  },
-  keyboardAvoidingView: {
-    flex: 1,
   },
   scrollContainer: {
     flex: 1,
@@ -243,28 +260,48 @@ const styles = StyleSheet.create({
   welcomeContainer: {
     padding: 16,
     alignItems: 'center',
+    marginTop: 40,
   },
   welcomeText: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
   },
+  messageContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    paddingHorizontal: 16,
+  },
+  userMessage: {
+    justifyContent: 'flex-end',
+  },
+  aiMessage: {
+    justifyContent: 'flex-start',
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 8,
+  },
   messageBubble: {
     maxWidth: '80%',
     padding: 12,
     borderRadius: 16,
-    marginBottom: 8,
   },
-  userMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#007AFF',
+  userBubble: {
+    backgroundColor: 'black',
   },
-  assistantMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#E9E9EB',
+  aiBubble: {
+    backgroundColor: '#E5E5EA',
   },
   messageText: {
     fontSize: 16,
+    color: '#000',
+  },
+  userMessageText: {
+    color: '#fff',
   },
   messageImage: {
     width: 200,
@@ -272,23 +309,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
   },
-  userMessageText: {
-    color: '#fff',
-  },
-  assistantMessageText: {
-    color: '#000',
-  },
   inputContainer: {
     flexDirection: 'row',
-    padding: 16,
+    padding: 12,
     borderTopWidth: 1,
     borderTopColor: '#E9E9EB',
     alignItems: 'center',
     backgroundColor: '#fff',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
   },
   addButton: {
     width: 40,
@@ -345,4 +372,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  assistantMessage: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E9E9EB',
+  },
+  header: {
+    flexDirection: 'row', // 保持水平排列
+    alignItems: 'center', // 垂直居中对齐
+    justifyContent: 'flex-start', // 靠左对齐
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+    paddingBottom: 20
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  timeContainer: {
+    alignItems: 'center', // 水平居中
+    justifyContent: 'center', // 如果需要垂直居中（可选）
+  },
+  headerTime: {
+    fontSize: 16, // 增大字体（之前是 12）
+    color: '#888',
+    textAlign: 'center', // 文本本身水平居中
+  },
+  
 }); 

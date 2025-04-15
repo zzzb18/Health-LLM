@@ -9,8 +9,16 @@ interface ChatCompletionRequest {
   messages: Message[];
 }
 
-const API_URL = 'https://api.sambanova.ai/v1/chat/completions';
-const MODEL = 'Meta-Llama-3.1-8B-Instruct';
+interface ChatCompletionResponse {
+  choices: {
+    message: {
+      content: string;
+    };
+  }[];
+}
+
+const API_URL = 'https://api.chatanywhere.org/v1';
+const MODEL = 'gpt-3.5-turbo';
 
 export async function getChatCompletion(
   userMessage: string,
@@ -28,13 +36,13 @@ export async function getChatCompletion(
   ];
 
   const requestBody: ChatCompletionRequest = {
-    stream: true,
+    stream: false,
     model: MODEL,
     messages,
   };
 
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetch(`${API_URL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiToken}`,
@@ -44,27 +52,14 @@ export async function getChatCompletion(
     });
 
     if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(`API request failed: ${errorData.error?.message || response.statusText}`);
     }
 
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('Failed to get response reader');
-    }
-
-    let result = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      
-      // 将 Uint8Array 转换为字符串
-      const chunk = new TextDecoder().decode(value);
-      result += chunk;
-    }
-
-    return result;
+    const data: ChatCompletionResponse = await response.json();
+    return data.choices[0]?.message?.content || '抱歉，无法获取回答';
   } catch (error) {
-    console.error('Error calling SambaNova API:', error);
+    console.error('Error calling API:', error);
     throw error;
   }
 } 

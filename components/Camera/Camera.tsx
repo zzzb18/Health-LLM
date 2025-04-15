@@ -1,103 +1,24 @@
-import {
-  CameraView,
-  CameraType,
-  useCameraPermissions,
-} from "expo-camera";
-import { useEffect, useState, useRef } from "react";
-import { Button, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React from "react";
+import React, { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { IconSymbol } from '../ui/IconSymbol';
 
 interface CameraProps {
+  isAnalyzing?: boolean;
+  onImageCapture?: () => void;
   onFeedback?: (feedback: string) => void;
   onEncouragement?: (encouragement: string) => void;
 }
 
-export default function CameraComponent({ onFeedback, onEncouragement }: CameraProps) {
-  const [facing, setFacing] = useState<CameraType>("back");
+export default function CameraComponent({ 
+  isAnalyzing = false,
+  onImageCapture,
+  onFeedback,
+  onEncouragement 
+}: CameraProps) {
+  const [facing, setFacing] = useState<'front' | 'back'>('front');
+  const [isCameraActive, setIsCameraActive] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
-  const [isStreaming, setIsStreaming] = useState(false);
-  const cameraRef = useRef<CameraView>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-
-  useEffect(() => {
-    return () => {
-      stopStreaming();
-    };
-  }, []);
-
-  const initWebSocket = () => {
-    wsRef.current = new WebSocket("ws://localhost:8000/ws/exercise-analysis/");
-    setIsStreaming(true);
-    
-    wsRef.current.onopen = () => {
-      console.log("WebSocket 连接已建立");
-      // 连接建立后立即开始发送帧
-      captureFrame();
-    };
-
-    wsRef.current.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.feedback && onFeedback) {
-          onFeedback(data.feedback);
-        }
-        if (data.encouragement && onEncouragement) {
-          onEncouragement(data.encouragement);
-        }
-      } catch (error) {
-        console.error("解析消息错误:", error);
-      }
-    };
-
-    wsRef.current.onerror = (error) => {
-      console.error("WebSocket 错误:", error);
-      setIsStreaming(false);
-    };
-
-    wsRef.current.onclose = () => {
-      console.log("WebSocket 连接已关闭");
-      setIsStreaming(false);
-    };
-  };
-
-  const captureFrame = async () => {
-    if (cameraRef.current && isStreaming) {
-      try {
-        const options = { quality: 0.5, base64: true };
-        const data = await cameraRef.current.takePictureAsync(options);
-
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && data.base64) {
-          wsRef.current.send(
-            JSON.stringify({
-              type: "exercise_frame",
-              frame: data.base64,
-            })
-          );
-        }
-
-        // 继续捕获下一帧
-        setTimeout(captureFrame, 200); // 每200ms捕获一帧
-      } catch (error) {
-        console.error("捕获帧错误:", error);
-      }
-    }
-  };
-
-  const stopStreaming = () => {
-    setIsStreaming(false);
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
-  };
-
-  const toggleStreaming = () => {
-    if (isStreaming) {
-      stopStreaming();
-    } else {
-      initWebSocket();
-    }
-  };
 
   if (!permission) {
     return <View />;
@@ -107,40 +28,46 @@ export default function CameraComponent({ onFeedback, onEncouragement }: CameraP
     return (
       <View style={styles.container}>
         <Text style={styles.message}>需要相机权限来分析运动姿势</Text>
-        <Button onPress={requestPermission} title="授予权限" />
+        <TouchableOpacity
+          style={styles.permissionButton}
+          onPress={requestPermission}
+        >
+          <Text style={styles.permissionButtonText}>授予权限</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <CameraView 
-        ref={cameraRef} 
-        style={styles.camera}
-        type={facing}
-      >
-        <View style={styles.controlsContainer}>
+      {!isCameraActive ? (
+        <View style={styles.startContainer}>
           <TouchableOpacity
-            style={styles.controlButton}
-            onPress={() => setFacing(facing === "back" ? "front" : "back")}
+            style={styles.startButton}
+            onPress={() => setIsCameraActive(true)}
           >
-            <IconSymbol name="camera.rotate" size={24} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.controlButton,
-              isStreaming ? styles.stopButton : styles.startButton
-            ]}
-            onPress={toggleStreaming}
-          >
-            <IconSymbol 
-              name={isStreaming ? "stop.fill" : "play.fill"} 
-              size={24} 
-              color="#fff" 
-            />
+            <IconSymbol name="play.fill" size={24} color="#fff" />
+            <Text style={styles.startButtonText}>打开摄像头</Text>
           </TouchableOpacity>
         </View>
-      </CameraView>
+      ) : (
+        <CameraView style={styles.camera} facing={facing}>
+          <View style={styles.controlsContainer}>
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={() => setFacing(facing === 'back' ? 'front' : 'back')}
+            >
+              <IconSymbol name="camera.rotate" size={24} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.controlButton, styles.stopButton]}
+              onPress={() => setIsCameraActive(false)}
+            >
+              <IconSymbol name="stop.fill" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </CameraView>
+      )}
     </View>
   );
 }
@@ -148,10 +75,42 @@ export default function CameraComponent({ onFeedback, onEncouragement }: CameraP
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
+  },
+  startContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  startButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,122,255,0.8)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+  },
+  startButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    marginLeft: 8,
   },
   message: {
-    textAlign: "center",
-    paddingBottom: 10,
+    textAlign: 'center',
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  permissionButton: {
+    backgroundColor: 'rgba(0,122,255,0.8)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  permissionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
   },
   camera: {
     flex: 1,
@@ -173,9 +132,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  startButton: {
-    backgroundColor: 'rgba(0,122,255,0.8)',
   },
   stopButton: {
     backgroundColor: 'rgba(255,59,48,0.8)',
