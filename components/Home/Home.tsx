@@ -66,7 +66,7 @@ const Home = () => {
           </Link>
 
           {/* Shop Now */}
-          <Link href={"/FoodAnalysis"} asChild>
+          <Link href={"/ShopNow"} asChild>
             <TouchableOpacity style={styles.gridItem}>
               <ImageBackground
                 source={require('../../assets/images/Home/Shop Now.png')}
