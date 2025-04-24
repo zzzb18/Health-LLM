@@ -11,35 +11,72 @@ import {
   Alert,
   Image,
   Linking,
-  Keyboard,
   SafeAreaView,
-  Button
+  Keyboard
 } from 'react-native';
-import { ThemedText } from '../ThemedText';
-import { ThemedView } from '../ThemedView';
-import { IconSymbol } from '../ui/IconSymbol';
+import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
+import { ThemedText } from '../components/ThemedText';
+import { ThemedView } from '../components/ThemedView';
+import { IconSymbol } from '../components/ui/IconSymbol';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getChatCompletion } from '@/services/api';
 import * as ImagePicker from 'expo-image-picker';
 
 interface Message {
-  type: 'user' | 'assistant';
+  type: 'user' | 'assistant' | 'function-list';
   content: string;
   image?: string;
 }
 
-// TODO: 替换为您的 API token
 const API_TOKEN = 'sk-8Jm36nvRw6Ns3MeCsb5km0bliO3qW9XGUhHbCVukvtXJTnAc';
 
 export function ChatInterface() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { title = 'SmartHealth' } = useLocalSearchParams();
+  const navigation = useNavigation();
+  const router = useRouter();
+
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      type: 'user',
+      content: 'What can you do for me?',
+    },
+    {
+      type: 'assistant',
+      content: 'I am a chatbot that helps you manage your diet and exercise.',
+    },
+    {
+      type: 'function-list',
+      content: 'Click the function below to start your healthy journey!\n• Real-time sports posture analysis\n• Dietary calorie analysis\n• Fitness data recording',
+    },
+  ]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [chatStartTime] = useState('Apr 6, 2025, 9:41 AM');
   const scrollViewRef = useRef<ScrollView>(null);
+  const [inputMarginBottom, setInputMarginBottom] = useState(0); // New state for dynamic marginBottom
   const insets = useSafeAreaInsets();
 
+  // 自定义返回按钮
+  useEffect(() => {
+    navigation.setOptions({
+      header: () => (
+        <SafeAreaView>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.customBackButton}>
+              <IconSymbol name="chevron.left" size={24} color="#000" />
+            </TouchableOpacity>
+            <Image
+              source={require('../assets/images/Home/logo.jpg')}
+              style={styles.avatar}
+            />
+            <Text style={styles.headerTitle}>{title}</Text>
+          </View>
+        </SafeAreaView>
+      ),
+    });
+  }, [navigation, router]);
 
 
   const handleImagePick = async () => {
@@ -51,7 +88,7 @@ export function ChatInterface() {
           '需要相册权限才能选择图片。请在设置中开启权限。',
           [
             { text: '取消', style: 'cancel' },
-            { text: '去设置', onPress: () => Linking.openSettings() }
+            { text: '去设置', onPress: () => Linking.openSettings() },
           ]
         );
         return;
@@ -76,7 +113,6 @@ export function ChatInterface() {
   const handleSend = async () => {
     if (!inputText.trim() && !selectedImage) return;
 
-    // 添加用户消息
     const userMessage: Message = {
       type: 'user',
       content: inputText.trim(),
@@ -86,11 +122,9 @@ export function ChatInterface() {
     setInputText('');
     setSelectedImage(null);
 
-    // 显示正在输入状态
     setIsTyping(true);
 
     try {
-      // 调用 API 获取回答
       const response = await getChatCompletion(
         selectedImage
           ? `[图片分析请求] ${inputText.trim() || '请分析这张图片'}`
@@ -98,7 +132,6 @@ export function ChatInterface() {
         API_TOKEN
       );
 
-      // 添加 AI 消息，但不立即显示内容
       const assistantMessage: Message = {
         type: 'assistant',
         content: '',
@@ -106,7 +139,6 @@ export function ChatInterface() {
       setMessages(prev => [...prev, assistantMessage]);
       setIsTyping(false);
 
-      // 使用打字机效果显示回答
       for (let i = 0; i < response.length; i++) {
         await new Promise(resolve => setTimeout(resolve, 50));
         setMessages(prev => {
@@ -128,11 +160,27 @@ export function ChatInterface() {
 
   const renderMessage = (message: Message) => {
     const isUser = message.type === 'user';
+    const isFunctionList = message.type === 'function-list';
+
+    if (isFunctionList) {
+      return (
+        <View style={[styles.messageContainer, styles.aiMessage]}>
+          <Image
+            source={require('../assets/images/Home/logo.jpg')}
+            style={styles.avatar}
+          />
+          <View style={[styles.messageBubble, styles.aiBubble]}>
+            <ThemedText style={styles.messageText}>{message.content}</ThemedText>
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View style={[styles.messageContainer, isUser ? styles.userMessage : styles.aiMessage]}>
         {!isUser && (
           <Image
-            source={require('../../assets/images/doctor.jpeg')}
+            source={require('../assets/images/Home/logo.jpg')}
             style={styles.avatar}
           />
         )}
@@ -152,36 +200,30 @@ export function ChatInterface() {
     );
   };
 
+  useEffect(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, [messages]);
+
   return (
-
-
     <SafeAreaView style={styles.scrollContainer}>
-
-      <View style={styles.header}>
-        <Image source={require('../../assets/images/doctor.jpeg')}
-          style={styles.avatar}></Image>
-        <Text style={styles.headerTitle}>SmartHealth</Text>
-
-      </View>
       <ScrollView
         ref={scrollViewRef}
         style={styles.messagesContainer}
         contentContainerStyle={[
           styles.messagesContent,
           {
-            paddingTop: insets.top,
-            paddingBottom: Math.max(keyboardHeight, insets.bottom)
-          }
+            paddingTop: 0, // 移除 paddingTop，减少顶部间距
+            paddingBottom: Math.max(keyboardHeight, insets.bottom),
+          },
         ]}
         automaticallyAdjustKeyboardInsets={true}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-
-        <Text style={styles.headerTime}>Apr 6, 2025, 9:41 AM</Text>
-
-
-        {messages.map(renderMessage)}
+        <Text style={styles.headerTime}>{chatStartTime}</Text>
+        {messages.map((message, index) => (
+          <React.Fragment key={index}>{renderMessage(message)}</React.Fragment>
+        ))}
         {isTyping && (
           <ThemedView style={[styles.messageBubble, styles.assistantMessage]}>
             <ThemedText style={styles.messageText}>正在输入...</ThemedText>
@@ -190,94 +232,49 @@ export function ChatInterface() {
       </ScrollView>
 
       <KeyboardAvoidingView
-        style={styles.keyboardAvoidingContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} // iOS 用 padding，Android 用 height
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20} // 根据需要调整偏移量
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={130}
       >
-
-        <ThemedView style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 4) }]}>
-          {selectedImage && (
-            <View style={styles.selectedImageContainer}>
-              <Image
-                source={{ uri: selectedImage }}
-                style={styles.selectedImagePreview}
-              />
-              <TouchableOpacity
-                style={styles.removeImageButton}
-                onPress={() => setSelectedImage(null)}
-              >
-                <IconSymbol name="chevron.right" size={16} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={handleImagePick}
-          >
-            <IconSymbol name="plus" size={20} color="#007AFF" />
-          </TouchableOpacity>
+        <ThemedView
+          style={[
+            styles.inputContainer
+          ]}
+        >
           <TextInput
             style={styles.input}
             value={inputText}
             onChangeText={setInputText}
-            placeholder="请输入您的问题..."
+            placeholder="Message..."
             placeholderTextColor="#666"
             multiline
           />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (!inputText.trim() && !selectedImage) && styles.sendButtonDisabled
-            ]}
-            onPress={handleSend}
-            disabled={!inputText.trim() && !selectedImage}
-          >
-            <IconSymbol name="paperplane.fill" size={24} color={inputText.trim() || selectedImage ? "#007AFF" : "#999"} />
+         
+          <TouchableOpacity style={styles.iconButton} onPress={handleImagePick}>
+            <IconSymbol name="photo" size={24} color="#666" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton} onPress={handleSend}>
+            <IconSymbol name="arrow.up" size={24} color="#666" />
           </TouchableOpacity>
         </ThemedView>
       </KeyboardAvoidingView>
     </SafeAreaView>
-
-
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
   scrollContainer: {
     flex: 1,
+    backgroundColor: '#FFF',
   },
-  messagesContainer: {
-    flex: 1,
-  },
-  messagesContent: {
-    padding: 16,
-  },
-  welcomeContainer: {
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 40,
-  },
-  welcomeText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-  messageContainer: {
+  header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-    paddingHorizontal: 16,
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
   },
-  userMessage: {
-    justifyContent: 'flex-end',
-  },
-  aiMessage: {
-    justifyContent: 'flex-start',
+  customBackButton: {
+    padding: 8,
   },
   avatar: {
     width: 32,
@@ -285,13 +282,43 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginRight: 8,
   },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  headerTime: {
+    marginTop: 30,
+    paddingTop: 0,
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+    marginVertical: 8, // 减小 marginVertical，从 16 改为 8
+  },
+  messagesContainer: {
+    flex: 1,
+  },
+  messagesContent: {
+    paddingHorizontal: 16,
+  },
+  messageContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  userMessage: {
+    justifyContent: 'flex-end',
+  },
+  aiMessage: {
+    justifyContent: 'flex-start',
+  },
   messageBubble: {
     maxWidth: '80%',
     padding: 12,
     borderRadius: 16,
   },
   userBubble: {
-    backgroundColor: 'black',
+    backgroundColor: '#000',
   },
   aiBubble: {
     backgroundColor: '#E5E5EA',
@@ -299,6 +326,7 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 16,
     color: '#000',
+    lineHeight: 20,
   },
   userMessageText: {
     color: '#fff',
@@ -317,15 +345,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
   },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F2F2F7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
   input: {
     flex: 1,
     backgroundColor: '#F2F2F7',
@@ -337,38 +356,9 @@ const styles = StyleSheet.create({
     maxHeight: 100,
     minHeight: 40,
   },
-  sendButton: {
+  iconButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F2F2F7',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
-  selectedImageContainer: {
-    position: 'absolute',
-    top: -80,
-    left: 16,
-    backgroundColor: '#F2F2F7',
-    borderRadius: 8,
-    padding: 4,
-  },
-  selectedImagePreview: {
-    width: 60,
-    height: 60,
-    borderRadius: 4,
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#FF3B30',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -376,27 +366,6 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     backgroundColor: '#E9E9EB',
   },
-  header: {
-    flexDirection: 'row', // 保持水平排列
-    alignItems: 'center', // 垂直居中对齐
-    justifyContent: 'flex-start', // 靠左对齐
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-    paddingBottom: 20
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  timeContainer: {
-    alignItems: 'center', // 水平居中
-    justifyContent: 'center', // 如果需要垂直居中（可选）
-  },
-  headerTime: {
-    fontSize: 16, // 增大字体（之前是 12）
-    color: '#888',
-    textAlign: 'center', // 文本本身水平居中
-  },
-  
-}); 
+});
+
+export default ChatInterface;

@@ -2,10 +2,7 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
-
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
 
   return (
     <Tabs
@@ -22,7 +19,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: '健康助手',
+          title: 'Home',
           tabBarIcon: ({ color }) => (
             <IconSymbol name="heart.fill" size={24} color={color} />
           ),
@@ -31,7 +28,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="exercise"
         options={{
-          title: '运动助手',
+          title: 'Assistant',
           tabBarIcon: ({ color }) => (
             <IconSymbol name="figure.run" size={24} color={color} />
           ),

@@ -1,13 +1,16 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChatInterface } from '@/components/Chat/ChatInterface';
+import { ChatInterface } from '@/app/Chat';
+import Home from '@/components/Home/Home';
+
 
 export default function HomeScreen() {
   return (
-    <SafeAreaView style={styles.container} edges={['left', 'right']}>
-      <ChatInterface />
-    </SafeAreaView>
+    
+      <Home></Home>
+   
+      
   );
 }
 
