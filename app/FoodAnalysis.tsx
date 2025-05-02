@@ -4,11 +4,23 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { IconSymbol } from '../components/ui/IconSymbol';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
+import { BarChart, LineChart, PieChart, PopulationPyramid, RadarChart } from "react-native-gifted-charts";
+import { center } from '@shopify/react-native-skia';
+
+
 const FoodAnalysisScreen = () => {
 
   const [image, setImage] = useState("");
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [notes, setNotes] = useState('');
+
+  // ...
+  const pieData = [
+    { value: 54, color: '#F7E186', text: '54%' },
+    { value: 40, color: '#F2A59D', text: '30%' },
+    { value: 20, color: '#99CBEC', text: '26%' },
+  ];
+
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -49,6 +61,63 @@ const FoodAnalysisScreen = () => {
     });
   }, [navigation, router]);
 
+  const renderDot = color => {
+    return (
+      <View
+        style={{
+          height: 10,
+          width: 10,
+          borderRadius: 5,
+          backgroundColor: color,
+          marginRight: 10,
+        }}
+      />
+    );
+  };
+
+  const renderLegendComponent = () => {
+
+    return (
+      <>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'center',
+            marginBottom: 10,
+            left: 20
+          }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              width: 120,
+              marginRight: 20,
+            }}>
+            {renderDot(pieData[0].color)}
+            <Text style={{ color: 'black' }}>Excellent: 47%</Text>
+          </View>
+          <View
+            style={{ flexDirection: 'row', alignItems: 'center', width: 120 }}>
+            {renderDot(pieData[1].color)}
+            <Text style={{ color: 'black' }}>Okay: 16%</Text>
+          </View>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              width: 120,
+              marginRight: 20,
+            }}>
+            {renderDot(pieData[2].color)}
+            <Text style={{ color: 'black' }}>Good: 40%</Text>
+          </View>
+        </View>
+
+      </>
+    );
+  };
+
+
   return (
     <View style={styles.container}>
 
@@ -83,12 +152,9 @@ const FoodAnalysisScreen = () => {
           <View style={styles.analysisSection}>
             {/* 模块1: 食物图片 */}
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>1. Food Image</Text>
-              <Image
-                source={require('../assets/images/test1.jpg')}
-                style={styles.analysisImage}
-                resizeMode="contain"
-              />
+              <Text style={styles.sectionTitle}>1. Nutritional distribution</Text>
+              <View style={styles.pieChartContainer}><PieChart data={pieData} showText textColor='black' /></View>
+              {renderLegendComponent()}
             </View>
 
             {/* 模块2: 营养信息 */}
@@ -123,11 +189,17 @@ const FoodAnalysisScreen = () => {
 
             {/* 模块3: 营养分布图片 */}
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>3.Nutrient Distribution</Text>
-              <Image
-                source={require('../assets/images/test2.jpg')} // 请替换为你的图片路径
-                style={styles.chartImage}
-                resizeMode="contain"
+              <Text style={styles.sectionTitle}>3.Achievement Plan</Text>
+              <RadarChart
+                // 假设这些是计算好的实际摄入营养成分占推荐摄入的百分比数值（直接写死）
+                data={[60, 50, 60, 50, 60, 50]}
+                labels={['Protein', 'Fat', 'Carbohydrates', 'Fiber', 'Vitamin C', 'Calcium']}
+                labelConfig={{ stroke: 'blue', fontWeight: 'bold' }}
+                // 对应的数据标签显示为百分比形式
+                dataLabels={['60%', '50%', '60%', '50%', '60%', '50%']}
+                dataLabelsConfig={{ stroke: 'brown' }}
+                dataLabelsPositionOffset={0}
+                maxValue={100}
               />
             </View>
           </View>
@@ -258,6 +330,9 @@ const styles = StyleSheet.create({
   customBackButton: {
     padding: 8,
   },
+  pieChartContainer: {
+    alignItems: 'center'
+  }
 });
 
 export default FoodAnalysisScreen;

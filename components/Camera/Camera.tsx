@@ -47,7 +47,7 @@ export default function CameraComponent({
             onPress={() => setIsCameraActive(true)}
           >
             <IconSymbol name="play.fill" size={24} color="#fff" />
-            <Text style={styles.startButtonText}>打开摄像头</Text>
+            <Text style={styles.startButtonText}>Open the camera</Text>
           </TouchableOpacity>
         </View>
       ) : (

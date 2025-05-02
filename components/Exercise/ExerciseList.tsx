@@ -9,16 +9,16 @@ interface ExerciseListProps {
 }
 
 const EXERCISE_TYPES = {
-  '深蹲': {
-    description: '锻炼下半身肌肉的基础动作',
+  'Squat': {
+    description: 'Fundamental exercise for lower body muscles',
     icon: 'figure.walk',
   },
-  '俯卧撑': {
-    description: '锻炼上半身肌肉的经典动作',
+  'Push-up': {
+    description: 'Classic exercise for upper body strength',
     icon: 'figure.arms.open',
   },
-  '平板支撑': {
-    description: '锻炼核心肌群的有效动作',
+  'Plank': {
+    description: 'Effective core strength exercise',
     icon: 'figure.core.training',
   },
 };
@@ -26,7 +26,7 @@ const EXERCISE_TYPES = {
 export function ExerciseList({ onSelect }: ExerciseListProps) {
   return (
     <ScrollView style={styles.container}>
-      <ThemedText style={styles.title}>选择运动类型</ThemedText>
+      <ThemedText style={styles.title}>Select Exercise Type</ThemedText>
       {Object.entries(EXERCISE_TYPES).map(([exercise, info]) => (
         <TouchableOpacity
           key={exercise}
@@ -82,4 +82,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-}); 
+});

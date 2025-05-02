@@ -34,9 +34,9 @@ export function ExerciseScreen() {
 
   const handleImageCapture = () => {
     if (selectedExercise && isAnalyzing) {
-      // 这里可以添加实际的图像分析逻辑
-      const randomFeedback = "动作标准，继续保持！";
-      const randomEncouragement = "你做得很好，继续加油！";
+      // Add actual image analysis logic here
+      const randomFeedback = "Great form, keep it up!";
+      const randomEncouragement = "You're doing awesome, keep going!";
       setFeedback(randomFeedback);
       setEncouragement(randomEncouragement);
     }
@@ -66,7 +66,7 @@ export function ExerciseScreen() {
             style={[styles.stopButton, { bottom: insets.bottom + 20 }]}
             onPress={handleStopAnalysis}
           >
-            <ThemedText style={styles.stopButtonText}>停止分析</ThemedText>
+            <ThemedText style={styles.stopButtonText}>Stop Analysis</ThemedText>
           </TouchableOpacity>
         </View>
       )}
@@ -94,4 +94,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-}); 
+});

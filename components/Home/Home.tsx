@@ -33,7 +33,6 @@ const Home = () => {
           </TouchableOpacity>
         </Link>
 
-        {/* Middle Modules (2x2 Grid) */}
         <View style={styles.grid}>
           {/* Food Analysis */}
           <Link href={"/FoodAnalysis"} asChild>
@@ -79,29 +78,10 @@ const Home = () => {
           </Link>
 
           {/* Fitness Record */}
-          <Link href={"/FoodAnalysis"} asChild>
-            <TouchableOpacity style={styles.gridItem}>
-              <ImageBackground
-                source={require('../../assets/images/Home/Fitness Record.png')}
-                style={styles.gridBackground}
-                imageStyle={styles.gridImage}
-              >
-
-              </ImageBackground>
-            </TouchableOpacity>
-          </Link>
+          
         </View>
 
-        {/* Daily/Weekly Summary */}
-        <TouchableOpacity style={styles.module}>
-          <ImageBackground
-            source={require('../../assets/images/Home/Daily Summary.png')} // 替换为实际图片路径
-            style={styles.moduleBackground}
-            imageStyle={styles.moduleImage}
-          >
-
-          </ImageBackground>
-        </TouchableOpacity>
+        
       </ScrollView>
     </SafeAreaView>
 
@@ -189,8 +169,8 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   gridItem: {
-    width: '48%', // 留出间隙
-    aspectRatio: 1, // 正方形
+    width: '100%', // 留出间隙
+    height: 160,
     borderRadius: 10,
     overflow: 'hidden',
     marginBottom: 8,

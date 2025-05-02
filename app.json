@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Health-LLM",
-    "slug": "Health-LLM",
+    "slug": "smarthealth",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -11,15 +11,22 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "我们需要访问您的摄像头以拍摄照片和视频。"
-      }
+        "NSCameraUsageDescription": "我们需要访问您的摄像头以拍摄照片和视频。",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.zzzb18.smarthealth"
     },
     "android": {
-      "permissions": ["CAMERA"],
+      "permissions": [
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.zzzb18.smarthealth"
     },
     "web": {
       "bundler": "metro",
@@ -48,6 +55,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "a35e8f43-db30-47c5-bc36-4a8e76243491"
+      }
+    },
+    "owner": "zzzb18"
   }
 }

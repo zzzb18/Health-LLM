@@ -19,8 +19,9 @@ import { ThemedText } from '../components/ThemedText';
 import { ThemedView } from '../components/ThemedView';
 import { IconSymbol } from '../components/ui/IconSymbol';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getChatCompletion } from '@/services/api';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 
 interface Message {
   type: 'user' | 'assistant' | 'function-list';
@@ -53,10 +54,21 @@ export function ChatInterface() {
   const [isTyping, setIsTyping] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [chatStartTime] = useState('Apr 6, 2025, 9:41 AM');
+  const [chatStartTime] = useState(() => {
+    return new Date().toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  });
   const scrollViewRef = useRef<ScrollView>(null);
+  const [uploadedImageUri, setUploadedImageUri] = useState<string | null>(null);
   const [inputMarginBottom, setInputMarginBottom] = useState(0); // New state for dynamic marginBottom
   const insets = useSafeAreaInsets();
+
 
   // 自定义返回按钮
   useEffect(() => {
@@ -78,6 +90,94 @@ export function ChatInterface() {
     });
   }, [navigation, router]);
 
+
+
+  // Upload image
+  const uploadImage = async (imageUri: string): Promise<string> => {
+    const formData = new FormData();
+    formData.append('image', {
+      uri: imageUri,
+      name: 'image.jpg',
+      type: 'image/jpeg',
+    } as any);
+
+    const requestConfig = {
+      url: 'http://47.107.28.21/upload/', // Confirm correct endpoint
+      method: 'POST',
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${API_TOKEN}`,
+      },
+      body: formData,
+    };
+
+    console.log('Upload Request:', {
+      url: requestConfig.url,
+      method: requestConfig.method,
+      headers: requestConfig.headers,
+      formData: {
+        image: {
+          uri: imageUri,
+          name: 'image.jpg',
+          type: 'image/jpeg',
+        },
+      },
+    });
+
+    const uploadResponse = await fetch(requestConfig.url, {
+      method: requestConfig.method,
+      headers: requestConfig.headers,
+      body: formData,
+    });
+
+    const rawResponse = await uploadResponse.text();
+    console.log('Raw Upload Response:', rawResponse);
+
+    if (!uploadResponse.ok) {
+      let errorMessage = `HTTP ${uploadResponse.status}: 上传图片失败`;
+      if (uploadResponse.status === 404) {
+        errorMessage = '上传端点未找到，请检查服务器配置。';
+      } else if (uploadResponse.status === 413) {
+        errorMessage = '图片过大，请选择更小的图片。';
+      } else {
+        try {
+          const errorData = JSON.parse(rawResponse);
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          errorMessage = `HTTP ${uploadResponse.status}: 服务器返回无效响应`;
+        }
+      }
+      throw new Error(errorMessage);
+    }
+
+    let uploadData;
+    try {
+      uploadData = JSON.parse(rawResponse);
+    } catch (e) {
+      throw new Error('服务器返回无效 JSON 响应: ' + rawResponse);
+    }
+
+    if (!uploadData.uri) {
+      throw new Error('服务器未返回图片 URI');
+    }
+
+    // Verify the URI is accessible
+    try {
+      const uriResponse = await fetch(uploadData.uri, {
+        method: 'HEAD',
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+        },
+      });
+      if (!uriResponse.ok) {
+        throw new Error(`图片 URI 无法访问: HTTP ${uriResponse.status}`);
+      }
+    } catch (e) {
+      throw new Error(`无法验证图片 URI: ${e.message}`);
+    }
+
+    return uploadData.uri;
+  };
 
   const handleImagePick = async () => {
     try {
@@ -101,18 +201,69 @@ export function ChatInterface() {
         quality: 1,
       });
 
+
       if (!result.canceled && result.assets[0]) {
-        setSelectedImage(result.assets[0].uri);
+        const imageUri = result.assets[0].uri;
+        setSelectedImage(imageUri);
+
+        // Compress image to under 1MB
+        const compressedUri = await compressImageToUnder1MB(imageUri);
+
+        // Upload the compressed image
+        const uploadedUri = await uploadImage(compressedUri);
+        setUploadedImageUri(uploadedUri);
       }
     } catch (error) {
-      Alert.alert('错误', '选择图片时出现错误');
-      console.error('Error picking image:', error);
+      Alert.alert('错误', `处理图片失败: ${error.message}`);
+      console.error('Error in handleImagePick:', error);
+      setSelectedImage(null);
+      setUploadedImageUri(null);
     }
   };
 
-  const handleSend = async () => {
-    if (!inputText.trim() && !selectedImage) return;
+  // Compress image to under 1MB
+  const compressImageToUnder1MB = async (imageUri: string): Promise<string> => {
+    const MAX_SIZE = 1024 * 1024; // 1MB in bytes
+    let quality = 0.7; // Initial quality
+    let width = 1024; // Initial width
+    let attempt = 0;
+    const maxAttempts = 3;
 
+    while (attempt < maxAttempts) {
+      // Compress image
+      const manipResult = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [{ resize: { width } }],
+        { compress: quality, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      // Check file size
+      const fileInfo = await FileSystem.getInfoAsync(manipResult.uri);
+      if (!fileInfo.exists) {
+        throw new Error('Failed to get compressed image info');
+      }
+
+      const fileSize = fileInfo.size;
+      console.log(`Attempt ${attempt + 1}: File size = ${fileSize} bytes, Quality = ${quality}, Width = ${width}`);
+
+      if (fileSize <= MAX_SIZE) {
+        return manipResult.uri;
+      }
+
+      // Reduce quality and/or width for next attempt
+      quality -= 0.2;
+      if (attempt === 1) {
+        width = Math.max(800, width - 200); // Reduce width on second attempt
+      }
+      attempt++;
+    }
+
+    throw new Error('Unable to compress image to under 1MB. Please select a smaller image.');
+  };
+
+  const handleSend = async () => {
+    if (!inputText.trim() && !uploadedImageUri) return;
+    setSelectedImage(null);
     const userMessage: Message = {
       type: 'user',
       content: inputText.trim(),
@@ -120,17 +271,31 @@ export function ChatInterface() {
     };
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
-    setSelectedImage(null);
-
     setIsTyping(true);
 
     try {
-      const response = await getChatCompletion(
-        selectedImage
-          ? `[图片分析请求] ${inputText.trim() || '请分析这张图片'}`
-          : inputText.trim(),
-        API_TOKEN
-      );
+      const requestBody = {
+        question: inputText.trim(),
+        uid: '59577368',
+        image: uploadedImageUri || '',
+      };
+
+      const response = await fetch('http://47.107.28.21/ask/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get response from server');
+      }
+
+
+      const data = await response.json();
+      const answer = data.answer;
 
       const assistantMessage: Message = {
         type: 'assistant',
@@ -139,24 +304,32 @@ export function ChatInterface() {
       setMessages(prev => [...prev, assistantMessage]);
       setIsTyping(false);
 
-      for (let i = 0; i < response.length; i++) {
+      for (let i = 0; i < answer.length; i++) {
         await new Promise(resolve => setTimeout(resolve, 50));
         setMessages(prev => {
           const newMessages = [...prev];
           newMessages[newMessages.length - 1] = {
             type: 'assistant',
-            content: response.substring(0, i + 1),
+            content: answer.substring(0, i + 1),
           };
           return newMessages;
         });
       }
     } catch (error) {
-      Alert.alert('错误', '无法获取回答，请稍后再试。');
-      console.error('Error getting chat completion:', error);
+      Alert.alert('Error', 'Unable to get a response. Please try again later.');
+      console.error('Error sending message:', error);
     } finally {
+      setUploadedImageUri(null); // 清除上传的 URI
       setIsTyping(false);
     }
   };
+
+  // 修改 handleClearImage 函数，同步清除上传的 URI
+  const handleClearImage = () => {
+    setSelectedImage(null);
+    setUploadedImageUri(null);
+  };
+
 
   const renderMessage = (message: Message) => {
     const isUser = message.type === 'user';
@@ -226,11 +399,22 @@ export function ChatInterface() {
         ))}
         {isTyping && (
           <ThemedView style={[styles.messageBubble, styles.assistantMessage]}>
-            <ThemedText style={styles.messageText}>正在输入...</ThemedText>
+            <ThemedText style={styles.messageText}>Typing...</ThemedText>
           </ThemedView>
         )}
       </ScrollView>
-
+      {selectedImage && (
+        <View style={styles.imagePreviewContainer}>
+          <Image
+            source={{ uri: selectedImage }}
+            style={styles.imagePreview}
+            resizeMode="cover"
+          />
+          <TouchableOpacity style={styles.clearImageButton} onPress={handleClearImage}>
+            <IconSymbol name="xmark.circle.fill" size={20} color="#FF0000" />
+          </TouchableOpacity>
+        </View>
+      )}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={130}
@@ -240,6 +424,7 @@ export function ChatInterface() {
             styles.inputContainer
           ]}
         >
+
           <TextInput
             style={styles.input}
             value={inputText}
@@ -248,7 +433,7 @@ export function ChatInterface() {
             placeholderTextColor="#666"
             multiline
           />
-         
+
           <TouchableOpacity style={styles.iconButton} onPress={handleImagePick}>
             <IconSymbol name="photo" size={24} color="#666" />
           </TouchableOpacity>
@@ -365,6 +550,23 @@ const styles = StyleSheet.create({
   assistantMessage: {
     alignSelf: 'flex-start',
     backgroundColor: '#E9E9EB',
+  },
+  imagePreviewContainer: {
+    position: 'relative',
+    marginBottom: 8,
+  },
+  imagePreview: {
+    left: 20,
+    width: 100,
+    height: 75,
+    borderRadius: 8,
+  },
+  clearImageButton: {
+    position: 'absolute',
+    left: 110,
+    top: -8,
+    backgroundColor: '#fff',
+    borderRadius: 10,
   },
 });
 
